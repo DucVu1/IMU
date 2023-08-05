@@ -1,3 +1,4 @@
+
 /*
  * MPU9250.h
  *
@@ -40,6 +41,7 @@
 #define REG_CONFIG_ACC 28
 #define REG_CONFIG_PWR1 107
 #define USER_CTRL 106
+#define General_Timeout 100
 
 
 #define TEMP_H 65
@@ -98,6 +100,8 @@ void mpu9250_read();
 void magnetometer_init();
 void mpu9250_calibrate_gyro();
 double** mpu9250_calibrate_accel();
+double** mpu9250_calibrate_magneto();
+double** Multiply_Mag();
 double** Multiply();
 
 #endif /* SRC_MPU9250_H_ */
