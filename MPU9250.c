@@ -10,6 +10,7 @@
 #include "stdio.h"
 #include "stdint.h"
 #include "stdlib.h"
+#include "math.h"
 extern I2C_HandleTypeDef hi2c1;
 int counter = 0;
 int starter = 0;
@@ -174,7 +175,21 @@ HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (AK8963_Address<<1)+0, CTRL_1
 		}
 
 }
-//Accelerometer and Gyroscope
+void mpu9250_angel(double accx, double accy, double accz,double* roll,double* pitch, double* yaw){
+	int sign;
+	if (accz>0){
+		sign = 1;
+	}
+	else{
+		sign = -1;
+	}
+    // Calculate roll angle
+    *roll = atan2(accy, sqrt(pow(accx, 2) + pow(accz, 2)));
+
+    // Calculate pitch angle
+    *pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+}
+//Accelerometer and Gyroscope and Magnetometer read
 void mpu9250_read(){
 	counter = counter+1;
 	if(counter ==200){
@@ -183,7 +198,7 @@ void mpu9250_read(){
 
 	float Scale_Constant_Acc=16384.0;
 	float Scale_Constant_Gyro = 131.0;
-	float Scale_Constant_Mag =1 ;
+	double roll, pitch,yaw;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
@@ -245,7 +260,13 @@ void mpu9250_read(){
 	double **calibrated_magnetometer = mpu9250_calibrate_magneto((double)x_mag,(double)y_mag,(double)z_mag);
 	double **calibrated_accelerometer = mpu9250_calibrate_accel((double)x_accr,(double)y_accr,(double)z_accr);
 	mpu9250_calibrate_gyro(x_gyror,y_gyror,z_gyror);
-
+	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],&roll,&pitch,&yaw);
+	//recalculate the angle to degree
+	roll = (roll/PI)*180;
+	pitch = (pitch/PI)*180;
+	//print data
+	printf(" Roll: %.5f  ",roll);
+	printf("Pitch: %.5f  \n",pitch);
     printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*9.8);
     printf(" %.5f  ", calibrated_accelerometer[1][0]*9.8);
     printf(" %.5f  ", calibrated_accelerometer[2][0]*9.8);
