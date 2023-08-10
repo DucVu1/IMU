@@ -10,7 +10,9 @@
 #include "stdio.h"
 #include "stdint.h"
 #include "stdlib.h"
+#include "math.h"
 extern I2C_HandleTypeDef hi2c1;
+extern TIM_HandleTypeDef htim2;
 int counter = 0;
 int starter = 0;
 double x_gyro_calibrate_para=0;
@@ -48,9 +50,9 @@ double** mpu9250_calibrate_magneto(double x_magr,double y_magr, double z_magr){
 	    measurement_matrix[i] = (double*)malloc(1 * sizeof(double));}
 
 	    // Update the array indexing and calibration values accordingly
-	    measurement_matrix[0][0] = x_magr - 0.038108;
-	    measurement_matrix[1][0] = y_magr - 0.011325;
-	    measurement_matrix[2][0] = z_magr + 0.047890;
+	    measurement_matrix[0][0] = x_magr + 19.026427;
+	    measurement_matrix[1][0] = y_magr - 90.319273;
+	    measurement_matrix[2][0] = z_magr - 90.319273;
 
 	    double **calibrated_matrix = Multiply_Mag(measurement_matrix, 3, 1, 3);
 	    freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
@@ -58,9 +60,9 @@ double** mpu9250_calibrate_magneto(double x_magr,double y_magr, double z_magr){
 }
 double** Multiply_Mag(double** matrix1, int row, int column1, int column2) {
     double calibrate_parameter[3][3] = {
-        {0.979159, 0.057901, -0.011943},
-        {0.057901, 1.010893, 0.006137},
-        {-0.011943, 0.006137, 0.996744}
+        {0.207995, 0.032704, 0.001643},
+        {0.032704, 0.180287, 0.003490},
+        {0.001643, 0.003490, 0.264669}
     };
 
     // Allocate memory for the resulting matrix
@@ -124,7 +126,7 @@ double** Multiply(double** matrix1, int row, int column1, int column2) {
 
 void mpu9250_init(){
 //check if the device is connected
- HAL_StatusTypeDef	ret = HAL_I2C_IsDeviceReady(&hi2c1, (Device_Address<<1)+0, 2, General_Timeout);
+ HAL_StatusTypeDef	ret = HAL_I2C_IsDeviceReady(&hi2c1, (Device_Address<<1)+0, 1, General_Timeout);
 	if(ret !=HAL_OK){
 		printf("The device is not ready. Check again\n");
 	}
@@ -172,10 +174,30 @@ HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (AK8963_Address<<1)+0, CTRL_1
 	if(ret2 !=HAL_OK){
 			printf("The device Magnetometer mode is not configured yet. Check again\n");
 		}
-
 }
-//Accelerometer and Gyroscope
+
+//Angle Computing using Calibrated data
+void mpu9250_angel(double accx, double accy, double accz,double gyrox,double gyroy,double gyroz,double* roll,double* pitch, double* yaw, double* roll2,double* pitch2, double* yaw2, int timer_val){
+	int sign;
+	if (accz>0){
+		sign = 1;
+	}
+	else{
+		sign = -1;
+	}
+    // Calculate roll angle
+    *roll = atan2(accy, sign*sqrt(pow(accx, 2) + Mu*pow(accz, 2)));
+
+    // Calculate pitch angle
+    *pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+
+    *roll2 = gyrox*timer_val*Time_constant;
+    *pitch2 = gyroy*timer_val*Time_constant;
+}
+
+//Accelerometer and Gyroscope and Magnetometer read
 void mpu9250_read(){
+	uint32_t timer_val = __HAL_TIM_GET_COUNTER(&htim2);
 	counter = counter+1;
 	if(counter ==200){
 		starter =1;
@@ -183,33 +205,34 @@ void mpu9250_read(){
 
 	float Scale_Constant_Acc=16384.0;
 	float Scale_Constant_Gyro = 131.0;
-	float Scale_Constant_Mag =1 ;
+	double roll, pitch, yaw,roll2, pitch2, yaw2,calibrated_gyrox, calibrated_gyroy, calibrated_gyroz;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
 	uint8_t readData,mag_mea_x[2],mag_mea_y[2],mag_mea_z[2],overflow_check;
 	int16_t x_acc,z_acc,y_acc,x_gyro,y_gyro,z_gyro,x_mag,y_mag,z_mag;
 
-	 //Read data from Accelerometer and Gyroscope
-
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_X_H, 1, &acc_mea_x[0], 1, General_Timeout);
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_X_L, 1, &acc_mea_x[1], 1, General_Timeout);
+	 //Read data from Gyroscope
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_X_H, 1, &gyro_mea_x[0], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_X_L, 1, &gyro_mea_x[1], 1, General_Timeout);
-	x_acc = ((int16_t)acc_mea_x[0]<<8)+acc_mea_x[1];
-	x_gyro = ((int16_t)gyro_mea_x[0]<<8)+gyro_mea_x[1];
-
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Y_H, 1, &acc_mea_y[0], 1, General_Timeout);
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Y_L, 1, &acc_mea_y[1], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Y_H, 1, &gyro_mea_y[0], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Y_L, 1, &gyro_mea_y[1], 1, General_Timeout);
-	y_acc = ((int16_t)acc_mea_y[0]<<8)+acc_mea_y[1];
-	y_gyro = ((int16_t)gyro_mea_y[0]<<8)+gyro_mea_y[1];
-
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_H, 1, &acc_mea_z[0], 1, General_Timeout);
-	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_L, 1, &acc_mea_z[1], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Z_H, 1, &gyro_mea_z[0], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Z_L, 1, &gyro_mea_z[1], 1, General_Timeout);
+	timer_val =  __HAL_TIM_GET_COUNTER(&htim2) - timer_val;
+	//Read data from Accelerometer
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_H, 1, &acc_mea_z[0], 1, General_Timeout);
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_L, 1, &acc_mea_z[1], 1, General_Timeout);
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_X_H, 1, &acc_mea_x[0], 1, General_Timeout);
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_X_L, 1, &acc_mea_x[1], 1, General_Timeout);
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Y_H, 1, &acc_mea_y[0], 1, General_Timeout);
+	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Y_L, 1, &acc_mea_y[1], 1, General_Timeout);
+
+
+	x_acc = ((int16_t)acc_mea_x[0]<<8)+acc_mea_x[1];
+	x_gyro = ((int16_t)gyro_mea_x[0]<<8)+gyro_mea_x[1];
+	y_acc = ((int16_t)acc_mea_y[0]<<8)+acc_mea_y[1];
+	y_gyro = ((int16_t)gyro_mea_y[0]<<8)+gyro_mea_y[1];
 	z_acc = ((int16_t)acc_mea_z[0]<<8)+acc_mea_z[1];
 	z_gyro = ((int16_t)gyro_mea_z[0]<<8)+gyro_mea_z[1];
 
@@ -244,23 +267,38 @@ void mpu9250_read(){
 	double **calibrated_magnetometer = mpu9250_calibrate_magneto((double)x_mag,(double)y_mag,(double)z_mag);
 	double **calibrated_accelerometer = mpu9250_calibrate_accel((double)x_accr,(double)y_accr,(double)z_accr);
 	mpu9250_calibrate_gyro(x_gyror,y_gyror,z_gyror);
-
-    printf("Calibrated acc: %.5f  ", calibrated_accelerometer[0][0]*9.8);
+	calibrated_gyrox = x_gyror-x_gyro_calibrate_para;
+	calibrated_gyroy = y_gyror-y_gyro_calibrate_para;
+	calibrated_gyroz = z_gyror-z_gyro_calibrate_para;
+	//Calculate Angle
+	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],calibrated_gyrox,calibrated_gyroy,calibrated_gyroz,&roll,&pitch,&yaw,&roll2,&pitch2,&yaw2,timer_val);
+	//recalculate the angle to degree
+	roll = (roll/PI)*180;
+	pitch = (pitch/PI)*180;
+	roll2 = (roll2/PI)*180;
+	pitch2 = (pitch2/PI)*180;
+	//print angle data
+	printf(" Roll: %.5f  ",roll);
+	printf("Pitch: %.5f  \n",pitch);
+	printf(" Roll2: %.5f  ",roll2);
+	printf("Pitch2: %.5f  \n",pitch2);
+	//print pure data
+    printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*9.8);
     printf(" %.5f  ", calibrated_accelerometer[1][0]*9.8);
-    printf(" %.5f    ", calibrated_accelerometer[2][0]*9.8);
+    printf(" %.5f  ", calibrated_accelerometer[2][0]*9.8);
 	if(starter ==1){
-	    printf("Calibrated gyro: %.5f  ", x_gyror-x_gyro_calibrate_para);
-	    printf(" %.5f  ", y_gyror-y_gyro_calibrate_para);
-	    printf(" %.5f  ", z_gyror-z_gyro_calibrate_para);
+	    printf("Calibrated gyro: %.5f  ", calibrated_gyrox);
+	    printf(" %.5f   ", calibrated_gyroy);
+	    printf(" %.5f   ", calibrated_gyroz);
 	}
 	else{
 	    printf(" %.5f   ", x_gyror);
 	    printf(" %.5f   ", y_gyror);
 	    printf(" %.5f   ", z_gyror);
 	}
-    printf("Calibrated acc: %.5f  ", calibrated_magnetometer[0][0]*9.8);
-    printf(" %.5f  ", calibrated_magnetometer[1][0]*9.8);
-    printf(" %.5f    ", calibrated_magnetometer[2][0]*9.8);
+    printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
+    printf(" %.5f  ", calibrated_magnetometer[1][0]);
+    printf(" %.5f    \n", calibrated_magnetometer[2][0]);
 
 
 
