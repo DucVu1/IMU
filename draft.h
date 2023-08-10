@@ -8,6 +8,10 @@
 
 #ifndef SRC_MPU9250_H_
 #define SRC_MPU9250_H_
+//Mathematical value
+#define PI 3.141592654
+#define Mu 0.01
+#define Time_constant 0.00025
 
 //checking register
 #define Device_WAI 0x75 // return should be 0x71 or 113
@@ -103,5 +107,6 @@ double** mpu9250_calibrate_accel();
 double** mpu9250_calibrate_magneto();
 double** Multiply_Mag();
 double** Multiply();
+void mpu9250_angel();
 
 #endif /* SRC_MPU9250_H_ */
