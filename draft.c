@@ -190,14 +190,15 @@ void mpu9250_angel(double accx, double accy, double accz,double gyrox,double gyr
 
     // Calculate pitch angle
     *pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
-
+    if(starter == 1){
     *roll2 = gyrox*timer_val*Time_constant;
     *pitch2 = gyroy*timer_val*Time_constant;
+    }
 }
 
 //Accelerometer and Gyroscope and Magnetometer read
-void mpu9250_read(){
-	uint32_t timer_val = __HAL_TIM_GET_COUNTER(&htim2);
+void mpu9250_read(uint32_t previous_time){
+	uint32_t current_time;
 	counter = counter+1;
 	if(counter ==200){
 		starter =1;
@@ -219,7 +220,6 @@ void mpu9250_read(){
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Y_L, 1, &gyro_mea_y[1], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Z_H, 1, &gyro_mea_z[0], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, GYRO_Z_L, 1, &gyro_mea_z[1], 1, General_Timeout);
-	timer_val =  __HAL_TIM_GET_COUNTER(&htim2) - timer_val;
 	//Read data from Accelerometer
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_H, 1, &acc_mea_z[0], 1, General_Timeout);
 	HAL_I2C_Mem_Read(&hi2c1, (Device_Address<<1)+0, ACC_Z_L, 1, &acc_mea_z[1], 1, General_Timeout);
@@ -270,8 +270,9 @@ void mpu9250_read(){
 	calibrated_gyrox = x_gyror-x_gyro_calibrate_para;
 	calibrated_gyroy = y_gyror-y_gyro_calibrate_para;
 	calibrated_gyroz = z_gyror-z_gyro_calibrate_para;
+	current_time =  abs(__HAL_TIM_GET_COUNTER(&htim2) - previous_time); //the initialize time was first count in the main function.
 	//Calculate Angle
-	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],calibrated_gyrox,calibrated_gyroy,calibrated_gyroz,&roll,&pitch,&yaw,&roll2,&pitch2,&yaw2,timer_val);
+	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],calibrated_gyrox,calibrated_gyroy,calibrated_gyroz,&roll,&pitch,&yaw,&roll2,&pitch2,&yaw2, current_time);
 	//recalculate the angle to degree
 	roll = (roll/PI)*180;
 	pitch = (pitch/PI)*180;
@@ -299,7 +300,4 @@ void mpu9250_read(){
     printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
     printf(" %.5f  ", calibrated_magnetometer[1][0]);
     printf(" %.5f    \n", calibrated_magnetometer[2][0]);
-
-
-
 }
