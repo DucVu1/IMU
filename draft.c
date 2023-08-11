@@ -3,8 +3,7 @@
  *
  *  Created on: Jul 20, 2023
  *      Author: Duc
- */
-
+ *
 #include "MPU9250.h"
 #include "main.h"
 #include "stdio.h"
@@ -290,11 +289,11 @@ void mpu9250_read(uint32_t previous_time){
 	//print angle data
 	printf("Timer: %.5f",(int)current_time*Time_constant);
 	printf("Roll_acc: %.5f  ",roll_acc);
-	printf("Pitch_acc: %.5f  \n",pitch_acc);
+	printf("Pitch_acc: %.5f  ",pitch_acc);
 	printf("Roll_gyro: %.5f  ",roll_gyro);
-	printf("Pitch_gyro: %.5f  \n",pitch_gyro);
+	printf("Pitch_gyro: %.5f  ",pitch_gyro);
 	printf("Roll: %.5f  ",roll);
-	printf("Pitch %.5f  \n",pitch);
+	printf("Pitch: %.5f  \n",pitch);
 	//print pure data
     printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
     printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
