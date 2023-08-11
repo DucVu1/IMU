@@ -3,7 +3,8 @@
  *
  *  Created on: Jul 20, 2023
  *      Author: Duc
- *
+ */
+
 #include "MPU9250.h"
 #include "main.h"
 #include "stdio.h"
@@ -177,6 +178,8 @@ void mpu9250_angel(double*roll, double* pitch, double* yaw,double accx, double a
 {
 	int sign;
 	double time;
+	static double previous_angle_roll_gyro = 0;
+	static double previous_angle_pitch_gyro = 0;
 	time = timer_val*Time_constant;
 	if (accz>0){
 		sign = 1;
@@ -190,8 +193,10 @@ void mpu9250_angel(double*roll, double* pitch, double* yaw,double accx, double a
 	// Calculate pitch angle
 	*pitch_acc = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
 	if(starter == 1){
-	*roll_gyro = gyrox*time;
-	*pitch_gyro = gyroy*time;
+	*roll_gyro = gyrox * time + previous_angle_roll_gyro;
+	*pitch_gyro = gyroy * time + previous_angle_pitch_gyro;
+	previous_angle_roll_gyro = *roll_gyro;
+	previous_angle_pitch_gyro = *pitch_gyro;
 	Complimentary_filter(roll, pitch,yaw,roll_acc,pitch_acc, roll_gyro,pitch_gyro,time);
 	}
 }
@@ -289,11 +294,11 @@ void mpu9250_read(uint32_t previous_time){
 	//print angle data
 	printf("Timer: %.5f",(int)current_time*Time_constant);
 	printf("Roll_acc: %.5f  ",roll_acc);
-	printf("Pitch_acc: %.5f  ",pitch_acc);
+	printf("Pitch_acc: %.5f  \n",pitch_acc);
 	printf("Roll_gyro: %.5f  ",roll_gyro);
-	printf("Pitch_gyro: %.5f  ",pitch_gyro);
+	printf("Pitch_gyro: %.5f  \n",pitch_gyro);
 	printf("Roll: %.5f  ",roll);
-	printf("Pitch: %.5f  \n",pitch);
+	printf("Pitch %.5f  \n",pitch);
 	//print pure data
     printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
     printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
