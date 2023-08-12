@@ -13,7 +13,7 @@
 #define Time_constant 0.00025 //4000Hz frequency
 #define Time_constant_filter 0.5 //should inspect to get a better number (read Low cost IMU implementation)
 #define g 9.8
-
+#define Counter_limit 100000
 //checking register
 #define Device_WAI 0x75 // return should be 0x71 or 113
 #define AK8963_WAI 0x0   // return should be 0x48 or 72
