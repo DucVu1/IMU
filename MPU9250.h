@@ -1,4 +1,3 @@
-
 /*
  * MPU9250.h
  *
@@ -8,13 +7,18 @@
 
 #ifndef SRC_MPU9250_H_
 #define SRC_MPU9250_H_
+//Mathematical value
 #define PI 3.141592654
+#define Mu 0.01
+#define Time_constant 0.00025 //4000Hz frequency
+#define Time_constant_filter 0.5 //should inspect to get a better number (read Low cost IMU implementation)
+#define g 9.8
 
 //checking register
 #define Device_WAI 0x75 // return should be 0x71 or 113
 #define AK8963_WAI 0x0   // return should be 0x48 or 72
 #define Device_Address 0x68
-//Gyroscope register
+//Gyroscope register and Parameter
 #define FS_GYRO_250 0
 #define FS_GYRO_500 8
 #define FS_GYRO_1000 16
@@ -25,8 +29,9 @@
 #define GYRO_Y_L 70
 #define GYRO_Z_H 71
 #define GYRO_Z_L 72
-
-//accelerometer register
+#define REG_CONFIG_GYRO 27
+#define Scale_Constant_Gyro 131.0
+//accelerometer register and Parameter
 #define FS_ACC_2G 0
 #define FS_ACC_4G 8
 #define FS_ACC_8G 16
@@ -37,9 +42,9 @@
 #define ACC_Y_L 62
 #define ACC_Z_H 63
 #define ACC_Z_L 64
-
-#define REG_CONFIG_GYRO 27
 #define REG_CONFIG_ACC 28
+#define Scale_Constant_Acc 16384.0
+
 #define REG_CONFIG_PWR1 107
 #define USER_CTRL 106
 #define General_Timeout 100
@@ -105,5 +110,6 @@ double** mpu9250_calibrate_magneto();
 double** Multiply_Mag();
 double** Multiply();
 void mpu9250_angel();
+void Complimentary_filter();
 
 #endif /* SRC_MPU9250_H_ */
