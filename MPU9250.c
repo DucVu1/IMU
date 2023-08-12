@@ -12,15 +12,11 @@
 #include "stdlib.h"
 #include "math.h"
 extern I2C_HandleTypeDef hi2c1;
-int counter = 0;
+extern TIM_HandleTypeDef htim2;
 int starter = 0;
 double x_gyro_calibrate_para=0;
 double y_gyro_calibrate_para=0;
 double z_gyro_calibrate_para=0;
-double x_gyro_cal;
-double y_gyro_cal;
-double z_gyro_cal;
-int count=0 ;
 void freeMatrix(double** matrix, int row) {
     for (int i = 0; i < row; i++) {
         free(matrix[i]);
@@ -28,6 +24,8 @@ void freeMatrix(double** matrix, int row) {
     free(matrix);
 }
 void mpu9250_calibrate_gyro( double x_gyror,double y_gyror, double z_gyror){
+	static double x_gyro_cal, y_gyro_cal, z_gyro_cal;
+	static int count=0;
 	if (count == 0){
 		x_gyro_cal=0;
 		y_gyro_cal=0;
@@ -124,59 +122,75 @@ double** Multiply(double** matrix1, int row, int column1, int column2) {
 }
 
 void mpu9250_init(){
-//check if the device is connected
- HAL_StatusTypeDef	ret = HAL_I2C_IsDeviceReady(&hi2c1, (Device_Address<<1)+0, 2, General_Timeout);
-	if(ret !=HAL_OK){
-		printf("The device is not ready. Check again\n");
-	}
-
-//congfic accelerometer
-uint8_t temp_data =FS_ACC_2G;
-HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_ACC, 1, &temp_data, 1, General_Timeout);
-	if(ret2 !=HAL_OK){
-			printf("The device accelerometer is not written. Check again\n");
+	//check if the device is connected
+	 HAL_StatusTypeDef	ret = HAL_I2C_IsDeviceReady(&hi2c1, (Device_Address<<1)+0, 2, General_Timeout);
+		if(ret !=HAL_OK){
+			printf("The device is not ready. Check again\n");
 		}
 
-//config gyroscope
-temp_data =FS_GYRO_250;
-HAL_StatusTypeDef ret3 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_GYRO, 1, &temp_data, 1, General_Timeout);
-	if(ret3 !=HAL_OK){
-			printf("The device gyroscope is not written. Check again\n");
+	//congfic accelerometer
+	uint8_t temp_data =FS_ACC_2G;
+	HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_ACC, 1, &temp_data, 1, General_Timeout);
+		if(ret2 !=HAL_OK){
+				printf("The device accelerometer is not written. Check again\n");
+			}
+
+	//config gyroscope
+	temp_data =FS_GYRO_250;
+	HAL_StatusTypeDef ret3 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_GYRO, 1, &temp_data, 1, General_Timeout);
+		if(ret3 !=HAL_OK){
+				printf("The device gyroscope is not written. Check again\n");
+			}
+	//config power management register
+	temp_data = 0;
+	HAL_StatusTypeDef ret4 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_PWR1, 1, &temp_data, 1, General_Timeout);
+		if(ret4 !=HAL_OK){
+				printf("The device fail exiting sleep mode. Check again\n");
 		}
-//config power management register
-temp_data = 0;
-HAL_StatusTypeDef ret4 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_CONFIG_PWR1, 1, &temp_data, 1, General_Timeout);
-	if(ret4 !=HAL_OK){
-			printf("The device fail exiting sleep mode. Check again\n");
-	}
-	magnetometer_init();
+		magnetometer_init();
 }
 
 //magnetomert configuration
 void magnetometer_init(){
-uint8_t temp_data;
-//Turn off Sensor Master I2C Interface using the USER_CTRL Register
-temp_data =USER_CTRL_Config;
-HAL_StatusTypeDef ret = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, USER_CTRL, 1, &temp_data, 1, General_Timeout);
-	if(ret !=HAL_OK){
-			printf("The device Sensor I2C master interface is not disabled. Check again\n");
-		}
-//Turn on Bypass Register
-temp_data =Bypass_Config;
-HAL_StatusTypeDef ret1 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_Bypass, 1, &temp_data, 1, General_Timeout);
-	if(ret1 !=HAL_OK){
-			printf("The device Bypass register is not enabled. Check again\n");
-		}
-//Configure mode for the magnetometer (Continuous2)
-temp_data =CTRL_1_Config_Continuous2;
-HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (AK8963_Address<<1)+0, CTRL_1, 1, &temp_data, 1, General_Timeout);
-	if(ret2 !=HAL_OK){
-			printf("The device Magnetometer mode is not configured yet. Check again\n");
-		}
+	uint8_t temp_data;
+	//Turn off Sensor Master I2C Interface using the USER_CTRL Register
+	temp_data =USER_CTRL_Config;
+	HAL_StatusTypeDef ret = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, USER_CTRL, 1, &temp_data, 1, General_Timeout);
+		if(ret !=HAL_OK){
+				printf("The device Sensor I2C master interface is not disabled. Check again\n");
+			}
+	//Turn on Bypass Register
+	temp_data =Bypass_Config;
+	HAL_StatusTypeDef ret1 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address<<1)+0, REG_Bypass, 1, &temp_data, 1, General_Timeout);
+		if(ret1 !=HAL_OK){
+				printf("The device Bypass register is not enabled. Check again\n");
+			}
+	//Configure mode for the magnetometer (Continuous2)
+	temp_data =CTRL_1_Config_Continuous2;
+	HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (AK8963_Address<<1)+0, CTRL_1, 1, &temp_data, 1, General_Timeout);
+		if(ret2 !=HAL_OK){
+				printf("The device Magnetometer mode is not configured yet. Check again\n");
+			}
 
 }
-void mpu9250_angel(double accx, double accy, double accz,double* roll,double* pitch, double* yaw){
+void Complimentary_filter(double*roll, double*pitch, double*yaw, double acc_roll,double acc_pitch,double gyro_roll,double gyro_pitch, double time)
+{
+	double alpha;
+	static int counter = 0;
+	alpha = Time_constant_filter/(Time_constant_filter+time);
+	if(counter ==0){
+		*roll = 0; // This mean that we assume the object is at rest during the first measure
+		*pitch = 0;
+		counter =1;
+	}
+	*roll = alpha * (*roll + gyro_roll)-(1-alpha)*acc_roll;
+	*pitch = alpha * (*pitch + gyro_pitch)-(1-alpha)*acc_pitch;
+}
+void mpu9250_angel(double accx, double accy, double accz,double gyrox,double gyroy,double gyroz,double* roll,double* pitch, double* yaw, double*acc_roll, double*acc_pitch, double*gyro_roll, double*gyro_pitch, int timer_val){
 	int sign;
+	static double previous_angle_roll_gyro = 0;
+	static double previous_angle_pitch_gyro = 0;
+	double time = timer_val*Time_constant;
 	if (accz>0){
 		sign = 1;
 	}
@@ -184,21 +198,26 @@ void mpu9250_angel(double accx, double accy, double accz,double* roll,double* pi
 		sign = -1;
 	}
     // Calculate roll angle
-    *roll = atan2(accy, sqrt(pow(accx, 2) + pow(accz, 2)));
-
+    *acc_roll = atan2(accy, sign*sqrt(pow(accx, 2) + pow(accz, 2)));
     // Calculate pitch angle
-    *pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+    *acc_pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+    if(starter == 1){
+    	*gyro_roll = gyrox * time + previous_angle_roll_gyro;
+    	*gyro_pitch = gyroy * time + previous_angle_pitch_gyro;
+    	previous_angle_roll_gyro = *gyro_roll;
+    	previous_angle_pitch_gyro = *gyro_pitch;
+    	Complimentary_filter(roll, pitch,yaw,*acc_roll,*acc_pitch, *gyro_roll, *gyro_pitch, time);
+    	}
 }
 //Accelerometer and Gyroscope and Magnetometer read
-void mpu9250_read(){
+void mpu9250_read(uint32_t previous_time){
+	uint32_t current_time;
+ 	static int counter = 0;
 	counter = counter+1;
 	if(counter ==200){
 		starter =1;
 	}
-
-	float Scale_Constant_Acc=16384.0;
-	float Scale_Constant_Gyro = 131.0;
-	double roll, pitch,yaw;
+	double roll, pitch, yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
@@ -260,20 +279,33 @@ void mpu9250_read(){
 	double **calibrated_magnetometer = mpu9250_calibrate_magneto((double)x_mag,(double)y_mag,(double)z_mag);
 	double **calibrated_accelerometer = mpu9250_calibrate_accel((double)x_accr,(double)y_accr,(double)z_accr);
 	mpu9250_calibrate_gyro(x_gyror,y_gyror,z_gyror);
-	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],&roll,&pitch,&yaw);
+	double x_gyro_calibrated = x_gyror- x_gyro_calibrate_para;
+	double y_gyro_calibrated = y_gyror- y_gyro_calibrate_para;
+	double z_gyro_calibrated = z_gyror- z_gyro_calibrate_para;
+	current_time = abs(__HAL_TIM_GET_COUNTER(&htim2) - previous_time);
+	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, current_time);
 	//recalculate the angle to degree
-	roll = (roll/PI)*180;
-	pitch = (pitch/PI)*180;
-	//print data
-	printf(" Roll: %.5f  ",roll);
-	printf("Pitch: %.5f  \n",pitch);
-    printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*9.8);
-    printf(" %.5f  ", calibrated_accelerometer[1][0]*9.8);
-    printf(" %.5f  ", calibrated_accelerometer[2][0]*9.8);
+	roll_acc = (roll_acc/PI)*180;
+	pitch_acc = (pitch_acc/PI)*180;
+	//print angel data
+	printf("Timer: %.5f",(double)current_time*Time_constant);
+	printf("Roll_acc: %.5f  ",roll_acc);
+	printf("Pitch_acc: %.5f  \n",pitch_acc);
+	if(starter == 1){
+	printf("Roll_gyro: %.5f  ",roll_gyro);
+	printf("Pitch_gyro: %.5f  \n",pitch_gyro);
+	printf("Roll: %.5f  ",roll);
+	printf("Pitch %.5f  \n",pitch);
+	}
+
+	//print raw data
+    printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
+    printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
+    printf(" %.5f  ", calibrated_accelerometer[2][0]*g);
 	if(starter ==1){
-	    printf("Calibrated gyro: %.5f  ", x_gyror-x_gyro_calibrate_para);
-	    printf(" %.5f   ", y_gyror-y_gyro_calibrate_para);
-	    printf(" %.5f   ", z_gyror-z_gyro_calibrate_para);
+	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
+	    printf(" %.5f   ", y_gyro_calibrated);
+	    printf(" %.5f   ", z_gyro_calibrated);
 	}
 	else{
 	    printf(" %.5f   ", x_gyror);
@@ -283,7 +315,4 @@ void mpu9250_read(){
     printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
     printf(" %.5f  ", calibrated_magnetometer[1][0]);
     printf(" %.5f    \n", calibrated_magnetometer[2][0]);
-
-
-
 }
