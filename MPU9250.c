@@ -210,8 +210,9 @@ void mpu9250_angel(double accx, double accy, double accz,double gyrox,double gyr
     	}
 }
 //Accelerometer and Gyroscope and Magnetometer read
-void mpu9250_read(uint32_t previous_time){
-	uint32_t current_time;
+void mpu9250_read(uint32_t first_time){
+	static uint32_t current_time, previous_time;
+	int time;
  	static int counter = 0;
 	counter = counter+1;
 	if(counter ==200){
@@ -282,26 +283,45 @@ void mpu9250_read(uint32_t previous_time){
 	double x_gyro_calibrated = x_gyror- x_gyro_calibrate_para;
 	double y_gyro_calibrated = y_gyror- y_gyro_calibrate_para;
 	double z_gyro_calibrated = z_gyror- z_gyro_calibrate_para;
-	current_time = abs(__HAL_TIM_GET_COUNTER(&htim2) - previous_time);
+	//get time
+	current_time = __HAL_TIM_GET_COUNTER(&htim2);
+	if(counter == 1){
+	previous_time = first_time;
+	time = abs((int)current_time - (int)previous_time);
+	printf("Time: %d  ", time);
+	previous_time = current_time;
+	}
+	else{
+	if(current_time >= previous_time){
+	time = (int)current_time - (int)previous_time;
+	}
+	else {
+	time = Counter_limit -(int)previous_time + (int)current_time;
+	}
+	previous_time = current_time;
+	}
 	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, current_time);
-	//recalculate the angle to degree
+	//recalculate the angle calculated by accelerometer to degree
 	roll_acc = (roll_acc/PI)*180;
 	pitch_acc = (pitch_acc/PI)*180;
 	//print angel data
-	printf("Timer: %.5f",(double)current_time*Time_constant);
+
+
+	printf("Counter: %d  ", counter);
+	printf("Timer: %.5f \n ",(double)time*Time_constant);
 	printf("Roll_acc: %.5f  ",roll_acc);
 	printf("Pitch_acc: %.5f  \n",pitch_acc);
 	if(starter == 1){
 	printf("Roll_gyro: %.5f  ",roll_gyro);
-	printf("Pitch_gyro: %.5f  \n",pitch_gyro);
+	printf("Pitch_gyro: %.5f  ",pitch_gyro);
 	printf("Roll: %.5f  ",roll);
 	printf("Pitch %.5f  \n",pitch);
-	}
+//	}
 
 	//print raw data
-    printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
-    printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
-    printf(" %.5f  ", calibrated_accelerometer[2][0]*g);
+   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
+   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
+   printf(" %.5f  ", calibrated_accelerometer[2][0]*g);
 	if(starter ==1){
 	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
 	    printf(" %.5f   ", y_gyro_calibrated);
@@ -312,7 +332,7 @@ void mpu9250_read(uint32_t previous_time){
 	    printf(" %.5f   ", y_gyror);
 	    printf(" %.5f   ", z_gyror);
 	}
-    printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
-    printf(" %.5f  ", calibrated_magnetometer[1][0]);
-    printf(" %.5f    \n", calibrated_magnetometer[2][0]);
+   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
+   printf(" %.5f  ", calibrated_magnetometer[1][0]);
+   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
 }
