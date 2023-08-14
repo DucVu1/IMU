@@ -14,7 +14,7 @@
 #define Time_constant 0.00025 //4000Hz frequency
 #define Time_constant_filter 0.5 //should inspect to get a better number (read Low cost IMU implementation)
 #define g 9.8
-#define alpha 0.95
+#define trust 0.95
 #define cutoff 0.95
 #define Counter_limit 100000
 
