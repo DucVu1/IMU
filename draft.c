@@ -4,7 +4,6 @@
  *  Created on: Jul 20, 2023
  *      Author: Duc
  */
-
 #include "MPU9250.h"
 #include "main.h"
 #include "stdio.h"
@@ -173,26 +172,30 @@ void magnetometer_init(){
 			}
 
 }
+//Lowpass_filter for accelerometer
 void Lowpass_filter(double *roll_acc, double previous_roll_acc, double *pitch_acc, double previous_pitch_acc){
-	*roll_acc = cutoff*(*roll_acc) + previous_roll_acc*(1-cutoff);
-	*pitch_acc = cutoff*(*pitch_acc) + previous_pitch_acc*(1-cutoff);
+	*roll_acc = cutoff * (*roll_acc) + previous_roll_acc*(1-cutoff);
+	*pitch_acc = cutoff * (*pitch_acc) + previous_pitch_acc*(1-cutoff);
 
 }
-void Complimentary_filter(double*roll, double*pitch, double*yaw, double roll_acc,double pitch_acc,double gyrox,double gyroy)
+
+void Complimentary_filter(double*first_angle, double gyro_data, double first_measured_angle, double time, double*second_angle, double second_measure_angle, double gyro_data2)
 {
-	*roll = alpha * (*roll + gyrox)-(1-alpha)*roll_acc;
-	*pitch = alpha * (*pitch + gyroy)-(1-alpha)*pitch_acc;
+	*first_angle = trust * (*first_angle + gyro_data * time) - (1-trust) * first_measured_angle;
+	*second_angle = trust * (*second_angle + gyro_data2 * time) - (1-trust) * second_measure_angle;
 }
+
 void mpu9250_angel(double accx, double accy, double accz,
-		double gyrox,double gyroy,double gyroz,
-		double magx, double magy, double magz,
-		double* roll,double* pitch, double* yaw,
-		double* roll_acc, double* pitch_acc, double* roll_gyro, double* pitch_gyro,double* previous_roll_acc, double* previous_pitch_acc, int timer_val){
+					double gyrox,double gyroy,double gyroz,
+					double magx, double magy, double magz,
+					double* roll, double* pitch, double* yaw,
+					double* roll_acc, double* pitch_acc, double* roll_gyro, double* pitch_gyro, double *yaw_magneto,double* previous_roll_acc, double* previous_pitch_acc, int timer_val)
+{
 	int sign;
 	int Xm, Ym;
 	static double previous_angle_roll_gyro = 0;
 	static double previous_angle_pitch_gyro = 0;
-	double time = timer_val*Time_constant;
+	double time = timer_val * Time_constant;
 	if (accz>0){
 	}
 	else{
@@ -202,16 +205,23 @@ void mpu9250_angel(double accx, double accy, double accz,
     *roll_acc = atan2(accy, sign*sqrt(pow(accx, 2) + pow(accz, 2)));
     // Calculate pitch angle
     *pitch_acc = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+    //Low_pass filter to removed noise from accelerometer calculation
     Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
+
     if(starter == 1){
+    	// Calculate angel from gyroscope
     	*roll_gyro = gyrox * time + previous_angle_roll_gyro;
     	*pitch_gyro = gyroy * time + previous_angle_pitch_gyro;
     	previous_angle_roll_gyro = *roll_gyro;
     	previous_angle_pitch_gyro = *pitch_gyro;
-    	Complimentary_filter(roll, pitch,yaw,*roll_acc,*pitch_acc, gyrox, gyroy);
-    	Xm = magx * cos((*pitch))-magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
+    	//Calculate angel by sensor fusion
+    	Complimentary_filter(roll, gyrox, *roll_acc, time, pitch, gyroy, *pitch_acc);
+    	//Calculate angel by magnetometer
+    	//Cross product to get the value of the Xm and Ym on 2D
+    	Xm = magx * cos((*pitch)) - magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
     	Ym = magy * cos(*roll) + magz * sin(*roll);
-    	*yaw = atan2(Ym,Xm);
+    	*yaw_magneto = atan2(Ym,Xm);
+    	Complimentary_filter(yaw, gyroz, *yaw_magneto, time);
     	}
 }
 //Accelerometer and Gyroscope and Magnetometer read
@@ -227,7 +237,7 @@ void mpu9250_read(uint32_t first_time){
 	if(counter ==200){
 		starter =1;
 	}
-	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro;
+	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro, yaw_magneto;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
@@ -289,35 +299,34 @@ void mpu9250_read(uint32_t first_time){
 	double **calibrated_magnetometer = mpu9250_calibrate_magneto((double)x_mag,(double)y_mag,(double)z_mag);
 	double **calibrated_accelerometer = mpu9250_calibrate_accel((double)x_accr,(double)y_accr,(double)z_accr);
 	mpu9250_calibrate_gyro(x_gyror,y_gyror,z_gyror);
-	double x_gyro_calibrated = x_gyror- x_gyro_calibrate_para;
-	double y_gyro_calibrated = y_gyror- y_gyro_calibrate_para;
-	double z_gyro_calibrated = z_gyror- z_gyro_calibrate_para;
+	double x_gyro_calibrated = x_gyror - x_gyro_calibrate_para;
+	double y_gyro_calibrated = y_gyror - y_gyro_calibrate_para;
+	double z_gyro_calibrated = z_gyror - z_gyro_calibrate_para;
 	//get time
 	current_time = __HAL_TIM_GET_COUNTER(&htim2);
 	if(counter == 1){
-	previous_time = first_time;
-	time = abs((int)current_time - (int)previous_time);
-	printf("Time: %d  ", time);
-	previous_time = current_time;
+		previous_time = first_time;
+		time = abs((int)current_time - (int)previous_time);
+		printf("Time: %d  ", time);
+		previous_time = current_time;
 	}
 	else{
-	if(current_time >= previous_time){
-	time = (int)current_time - (int)previous_time;
-	}
-	else {
-	time = Counter_limit -(int)previous_time + (int)current_time;
-	}
-	previous_time = current_time;
+		if(current_time >= previous_time){
+			time = (int)current_time - (int)previous_time;
+		}
+		else {
+			time = Counter_limit -(int)previous_time + (int)current_time;
+		}
+		previous_time = current_time;
 	}
 	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],
-			x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,calibrated_magnetometer[0][0], calibrated_magnetometer[1][0],calibrated_magnetometer[2][0],
-			&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro,&previous_roll_acc, &previous_pitch_acc, current_time);
+					x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,calibrated_magnetometer[0][0], calibrated_magnetometer[1][0],calibrated_magnetometer[2][0],
+					&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto, &previous_roll_acc, &previous_pitch_acc, current_time);
 	//recalculate the angle calculated by accelerometer to degree
 	roll_acc = (roll_acc/PI)*180;
 	pitch_acc = (pitch_acc/PI)*180;
 	roll = (roll/PI)*180;
 	pitch = (pitch/PI)*180;
-	yaw = (yaw/PI)*180;
 	//print angel data
 
 
@@ -325,13 +334,14 @@ void mpu9250_read(uint32_t first_time){
 	printf("Timer: %.5f \n ",(double)time*Time_constant);
 	printf("Roll_acc: %.5f  ",roll_acc);
 	printf("Pitch_acc: %.5f  \n",pitch_acc);
-	
+
 	if(starter == 1){
-	printf("Roll_gyro: %.5f  ",roll_gyro);
-	printf("Pitch_gyro: %.5f  ",pitch_gyro);
-	printf("Roll: %.5f  ",roll);
-	printf("Pitch %.5f  \n",pitch);
-	printf("Yaw %.5f  \n", yaw);
+		printf("Roll_gyro: %.5f  ",roll_gyro);
+		printf("Pitch_gyro: %.5f  ",pitch_gyro);
+		printf("Yaw_magneto: %.5f  ",yaw_magneto);
+		printf("Roll: %.5f  ",roll);
+		printf("Pitch %.5f  \n",pitch);
+		printf("Yaw %.5f  \n", yaw);
 	}
 
 	//print raw data
