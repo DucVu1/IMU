@@ -1,3 +1,4 @@
+
 /*
  * MPU9250.h
  *
@@ -13,7 +14,10 @@
 #define Time_constant 0.00025 //4000Hz frequency
 #define Time_constant_filter 0.5 //should inspect to get a better number (read Low cost IMU implementation)
 #define g 9.8
+#define trust 0.02
+#define cutoff 0.95
 #define Counter_limit 100000
+
 //checking register
 #define Device_WAI 0x75 // return should be 0x71 or 113
 #define AK8963_WAI 0x0   // return should be 0x48 or 72
@@ -31,6 +35,7 @@
 #define GYRO_Z_L 72
 #define REG_CONFIG_GYRO 27
 #define Scale_Constant_Gyro 131.0
+#define Sampling 100
 //accelerometer register and Parameter
 #define FS_ACC_2G 0
 #define FS_ACC_4G 8
@@ -111,5 +116,5 @@ double** Multiply_Mag();
 double** Multiply();
 void mpu9250_angel();
 void Complimentary_filter();
-
+void Lowpass_filter();
 #endif /* SRC_MPU9250_H_ */
