@@ -179,10 +179,9 @@ void Lowpass_filter(double *roll_acc, double previous_roll_acc, double *pitch_ac
 
 }
 
-void Complimentary_filter(double*first_angle, double gyro_data, double first_measured_angle, double time, double*second_angle, double second_measure_angle, double gyro_data2)
+void Complimentary_filter(double*angle, double gyro_data, double measured_angle, double time)
 {
-	*first_angle = trust * (*first_angle + gyro_data * time) - (1-trust) * first_measured_angle;
-	*second_angle = trust * (*second_angle + gyro_data2 * time) - (1-trust) * second_measure_angle;
+	*angle = trust * (*angle + gyro_data * time) - (1-trust) * measured_angle;
 }
 
 void mpu9250_angel(double accx, double accy, double accz,
@@ -215,7 +214,8 @@ void mpu9250_angel(double accx, double accy, double accz,
     	previous_angle_roll_gyro = *roll_gyro;
     	previous_angle_pitch_gyro = *pitch_gyro;
     	//Calculate angel by sensor fusion
-    	Complimentary_filter(roll, gyrox, *roll_acc, time, pitch, gyroy, *pitch_acc);
+    	Complimentary_filter(roll, gyrox, *roll_acc, time);
+    	Complimentary_filter(pitch, gyroy, *pitch_acc, time);
     	//Calculate angel by magnetometer
     	//Cross product to get the value of the Xm and Ym on 2D
     	Xm = magx * cos((*pitch)) - magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
