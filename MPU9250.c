@@ -4,7 +4,6 @@
  *  Created on: Jul 20, 2023
  *      Author: Duc
  */
-
 #include "MPU9250.h"
 #include "main.h"
 #include "stdio.h"
@@ -35,7 +34,7 @@ void mpu9250_calibrate_gyro( double x_gyror,double y_gyror, double z_gyror){
 	y_gyro_cal += y_gyror;
 	z_gyro_cal += z_gyror;
 	count=count+1;
-    if (count == 200) {
+    if (count == Sampling ) {
         x_gyro_calibrate_para = x_gyro_cal /count;
         y_gyro_calibrate_para = y_gyro_cal / count;
         z_gyro_calibrate_para = z_gyro_cal / count;
@@ -86,9 +85,9 @@ double** mpu9250_calibrate_accel(double x_accr, double y_accr, double z_accr) {
     measurement_matrix[i] = (double*)malloc(1 * sizeof(double));}
 
     // Update the array indexing and calibration values accordingly
-    measurement_matrix[0][0] = x_accr - 0.038108;
-    measurement_matrix[1][0] = y_accr - 0.011325;
-    measurement_matrix[2][0] = z_accr + 0.047890;
+    measurement_matrix[0][0] = x_accr + 0.045867;
+    measurement_matrix[1][0] = y_accr + 0.262932;
+    measurement_matrix[2][0] = z_accr + 0.015154;
 
     double **calibrated_matrix = Multiply(measurement_matrix, 3, 1, 3);
     freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
@@ -97,9 +96,9 @@ double** mpu9250_calibrate_accel(double x_accr, double y_accr, double z_accr) {
 
 double** Multiply(double** matrix1, int row, int column1, int column2) {
     double calibrate_parameter[3][3] = {
-        {0.979159, 0.057901, -0.011943},
-        {0.057901, 1.010893, 0.006137},
-        {-0.011943, 0.006137, 0.996744}
+        {1.004807, 0.011594, -0.012585},
+        {0.011594, 1.004890, 0.027382},
+        {-0.012585, 0.027382, 0.990353}
     };
 
     // Allocate memory for the resulting matrix
@@ -173,52 +172,67 @@ void magnetometer_init(){
 			}
 
 }
-void Complimentary_filter(double*roll, double*pitch, double*yaw, double acc_roll,double acc_pitch,double gyro_roll,double gyro_pitch, double time)
-{
-	double alpha;
-	static int counter = 0;
-	alpha = Time_constant_filter/(Time_constant_filter+time);
-	if(counter ==0){
-		*roll = 0; // This mean that we assume the object is at rest during the first measure
-		*pitch = 0;
-		counter =1;
-	}
-	*roll = alpha * (*roll + gyro_roll)-(1-alpha)*acc_roll;
-	*pitch = alpha * (*pitch + gyro_pitch)-(1-alpha)*acc_pitch;
+//Lowpass_filter for accelerometer
+void Lowpass_filter(double *roll_acc, double previous_roll_acc, double *pitch_acc, double previous_pitch_acc){
+	*roll_acc = cutoff * (*roll_acc) + previous_roll_acc*(1-cutoff);
+	*pitch_acc = cutoff * (*pitch_acc) + previous_pitch_acc*(1-cutoff);
+
 }
-void mpu9250_angel(double accx, double accy, double accz,double gyrox,double gyroy,double gyroz,double* roll,double* pitch, double* yaw, double*acc_roll, double*acc_pitch, double*gyro_roll, double*gyro_pitch, int timer_val){
-	int sign;
+
+void Complimentary_filter(double*angle, double gyro_data, double measured_angle, double time)
+{
+	*angle = trust * (*angle + gyro_data * time) - (1-trust) * measured_angle;
+}
+
+void mpu9250_angel(double accx, double accy, double accz,
+					double gyrox,double gyroy,double gyroz,
+					double magx, double magy, double magz,
+					double* roll, double* pitch, double* yaw,
+					double* roll_acc, double* pitch_acc, double* roll_gyro, double* pitch_gyro, double *yaw_magneto,double* previous_roll_acc, double* previous_pitch_acc, double time)
+{
+	int Xm, Ym;
 	static double previous_angle_roll_gyro = 0;
 	static double previous_angle_pitch_gyro = 0;
-	double time = timer_val*Time_constant;
-	if (accz>0){
-		sign = 1;
-	}
-	else{
-		sign = -1;
-	}
     // Calculate roll angle
-    *acc_roll = atan2(accy, sign*sqrt(pow(accx, 2) + pow(accz, 2)));
+    (*pitch_acc) = atan2(accx,accz)*(180/PI);
     // Calculate pitch angle
-    *acc_pitch = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+    (*roll_acc) = atan2(accy, accz)*(180/PI);
+    //Low_pass filter to removed noise from accelerometer calculation
+    Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
+    *previous_roll_acc = (*roll_acc);
+    *previous_pitch_acc = (*pitch_acc);
+
     if(starter == 1){
-    	*gyro_roll = gyrox * time + previous_angle_roll_gyro;
-    	*gyro_pitch = gyroy * time + previous_angle_pitch_gyro;
-    	previous_angle_roll_gyro = *gyro_roll;
-    	previous_angle_pitch_gyro = *gyro_pitch;
-    	Complimentary_filter(roll, pitch,yaw,*acc_roll,*acc_pitch, *gyro_roll, *gyro_pitch, time);
+    	// Calculate angel from gyroscope
+    	*roll_gyro = gyrox * time + previous_angle_roll_gyro;
+    	*pitch_gyro = gyroy * time + previous_angle_pitch_gyro;
+    	previous_angle_roll_gyro = *roll_gyro;
+    	previous_angle_pitch_gyro = *pitch_gyro;
+    	//Calculate angel by sensor fusion
+    	Complimentary_filter(roll, gyrox, (*roll_acc), time);
+    	Complimentary_filter(pitch, gyroy, (*pitch_acc), time);
+    	//Calculate angel by magnetometer
+    	//Cross product to get the value of the Xm and Ym on 2D
+    	Xm = magx * cos((*pitch)) - magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
+    	Ym = magy * cos(*roll) + magz * sin(*roll);
+    	*yaw_magneto = atan2(Ym,Xm);
+    	Complimentary_filter(yaw, gyroz, *yaw_magneto, time);
     	}
 }
 //Accelerometer and Gyroscope and Magnetometer read
 void mpu9250_read(uint32_t first_time){
 	static uint32_t current_time, previous_time;
-	int time;
+	double time;
  	static int counter = 0;
+ 	static double previous_roll_acc = 0;
+ 	static double previous_pitch_acc = 0;
+ 	static double roll = 0;
+ 	static double pitch =0;
 	counter = counter+1;
-	if(counter ==200){
+	if(counter == Sampling){
 		starter =1;
 	}
-	double roll, pitch, yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro;
+	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro, yaw_magneto;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
@@ -280,59 +294,58 @@ void mpu9250_read(uint32_t first_time){
 	double **calibrated_magnetometer = mpu9250_calibrate_magneto((double)x_mag,(double)y_mag,(double)z_mag);
 	double **calibrated_accelerometer = mpu9250_calibrate_accel((double)x_accr,(double)y_accr,(double)z_accr);
 	mpu9250_calibrate_gyro(x_gyror,y_gyror,z_gyror);
-	double x_gyro_calibrated = x_gyror- x_gyro_calibrate_para;
-	double y_gyro_calibrated = y_gyror- y_gyro_calibrate_para;
-	double z_gyro_calibrated = z_gyror- z_gyro_calibrate_para;
+	double x_gyro_calibrated = x_gyror - x_gyro_calibrate_para;
+	double y_gyro_calibrated = y_gyror - y_gyro_calibrate_para;
+	double z_gyro_calibrated = z_gyror - z_gyro_calibrate_para;
 	//get time
 	current_time = __HAL_TIM_GET_COUNTER(&htim2);
 	if(counter == 1){
-	previous_time = first_time;
-	time = abs((int)current_time - (int)previous_time);
-	printf("Time: %d  ", time);
-	previous_time = current_time;
+		previous_time = first_time;
+		time = (abs((int)current_time - (int)previous_time)) * Time_constant;
+		previous_time = current_time;
 	}
 	else{
-	if(current_time >= previous_time){
-	time = (int)current_time - (int)previous_time;
+		if(current_time >= previous_time){
+			time = ((int)current_time - (int)previous_time)* Time_constant;
+		}
+		else {
+			time = (Counter_limit -(int)previous_time + (int)current_time)* Time_constant;
+		}
+		previous_time = current_time;
 	}
-	else {
-	time = Counter_limit -(int)previous_time + (int)current_time;
-	}
-	previous_time = current_time;
-	}
-	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, current_time);
-	//recalculate the angle calculated by accelerometer to degree
-	roll_acc = (roll_acc/PI)*180;
-	pitch_acc = (pitch_acc/PI)*180;
+	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],
+					x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,calibrated_magnetometer[0][0], calibrated_magnetometer[1][0],calibrated_magnetometer[2][0],
+					&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto, &previous_roll_acc, &previous_pitch_acc, time);
 	//print angel data
 
-
-	printf("Counter: %d  ", counter);
-	printf("Timer: %.5f \n ",(double)time*Time_constant);
-	printf("Roll_acc: %.5f  ",roll_acc);
-	printf("Pitch_acc: %.5f  \n",pitch_acc);
 	if(starter == 1){
-	printf("Roll_gyro: %.5f  ",roll_gyro);
-	printf("Pitch_gyro: %.5f  ",pitch_gyro);
-	printf("Roll: %.5f  ",roll);
-	printf("Pitch %.5f  \n",pitch);
-//	}
-
+//		printf("Roll_acc: %.5f  ",roll_acc);
+//		printf("Pitch_acc: %.5f  \n",pitch_acc);
+//		printf("Roll_gyro: %.5f  ",roll_gyro);
+//		printf("Pitch_gyro: %.5f  \n",pitch_gyro);
+		printf("Roll: %.5f  ",roll);
+		printf("Pitch %.5f  \n",pitch);
+	}
+//		printf("Yaw_magneto: %.5f  ",yaw_magneto);
+//		printf("Yaw %.5f  \n", yaw);
+//	printf(" %.5f  ", x_accr);
+//	printf(" %.5f  ", y_accr);
+//	printf(" %.5f  \n", z_accr);
 	//print raw data
-   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
-   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
-   printf(" %.5f  ", calibrated_accelerometer[2][0]*g);
-	if(starter ==1){
-	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
-	    printf(" %.5f   ", y_gyro_calibrated);
-	    printf(" %.5f   ", z_gyro_calibrated);
-	}
-	else{
-	    printf(" %.5f   ", x_gyror);
-	    printf(" %.5f   ", y_gyror);
-	    printf(" %.5f   ", z_gyror);
-	}
-   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
-   printf(" %.5f  ", calibrated_magnetometer[1][0]);
-   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
+//	   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
+//	   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
+//	   printf(" %.5f  \n", calibrated_accelerometer[2][0]*g);
+//	if(starter ==1){
+//	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
+//	    printf(" %.5f   ", y_gyro_calibrated);
+//	    printf(" %.5f   \n", z_gyro_calibrated);
+//	}
+//	else{
+//	    printf(" %.5f   ", x_gyror);
+//	    printf(" %.5f   ", y_gyror);
+//	    printf(" %.5f  \n ", z_gyror);
+//	}
+//   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
+//   printf(" %.5f  ", calibrated_magnetometer[1][0]);
+//   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
 }
