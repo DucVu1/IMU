@@ -10,16 +10,18 @@
 #include "stdint.h"
 #include "stdlib.h"
 #include "math.h"
+#include "Kalman_filter.h"
 extern I2C_HandleTypeDef hi2c1;
 extern TIM_HandleTypeDef htim2;
 int starter = 0;
 double x_gyro_calibrate_para=0;
 double y_gyro_calibrate_para=0;
 double z_gyro_calibrate_para=0;
-void freeMatrix(double** matrix, int row) {
-    for (int i = 0; i < row; i++) {
-        free(matrix[i]);
-    }
+void freeMatrix(double** matrix) {
+
+	free(matrix[0]);
+	free(matrix[1]);
+	free(matrix[2]);
     free(matrix);
 }
 void mpu9250_calibrate_gyro( double x_gyror,double y_gyror, double z_gyror){
@@ -34,92 +36,65 @@ void mpu9250_calibrate_gyro( double x_gyror,double y_gyror, double z_gyror){
 	y_gyro_cal += y_gyror;
 	z_gyro_cal += z_gyror;
 	count=count+1;
-    if (count == 200) {
+    if (count == Sampling ) {
         x_gyro_calibrate_para = x_gyro_cal /count;
         y_gyro_calibrate_para = y_gyro_cal / count;
         z_gyro_calibrate_para = z_gyro_cal / count;
     }
 }
-double** mpu9250_calibrate_magneto(double x_magr,double y_magr, double z_magr){
-	 double **measurement_matrix = (double**)malloc(3 * sizeof(double*));
-	    for(int i=0;i<3;i++){
-	    measurement_matrix[i] = (double*)malloc(1 * sizeof(double));}
 
-	    // Update the array indexing and calibration values accordingly
-	    measurement_matrix[0][0] = x_magr + 19.026427;
-	    measurement_matrix[1][0] = y_magr - 90.319273;
-	    measurement_matrix[2][0] = z_magr - 90.319273;
+double** Multiply_Matrix(double** matrix1, double calibrate_parameter[3][3]) {
+    // Allocate memory for the resulting matrix
+    double** multiplied_matrix = (double**)malloc(3 * sizeof(double*));
+	multiplied_matrix[0] = (double*)malloc(1 * sizeof(double));
+	multiplied_matrix[1] = (double*)malloc(1 * sizeof(double));
+	multiplied_matrix[2] = (double*)malloc(1 * sizeof(double));
 
-	    double **calibrated_matrix = Multiply_Mag(measurement_matrix, 3, 1, 3);
-	    freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
-	    return calibrated_matrix;
+    // Perform matrix multiplication
+	multiplied_matrix[0][0] = matrix1[0][0] * calibrate_parameter[0][0] + matrix1[1][0] * calibrate_parameter[0][1] + matrix1[2][0] * calibrate_parameter[0][2];
+	multiplied_matrix[1][0] = matrix1[0][0] * calibrate_parameter[1][0] + matrix1[1][0] * calibrate_parameter[1][1] + matrix1[2][0] * calibrate_parameter[1][2];
+	multiplied_matrix[2][0] = matrix1[0][0] * calibrate_parameter[2][0] + matrix1[1][0] * calibrate_parameter[2][1] + matrix1[2][0] * calibrate_parameter[2][2];
+    return multiplied_matrix;
 }
-double** Multiply_Mag(double** matrix1, int row, int column1, int column2) {
+double** mpu9250_calibrate_magneto(double x_magr,double y_magr, double z_magr){
     double calibrate_parameter[3][3] = {
         {0.207995, 0.032704, 0.001643},
         {0.032704, 0.180287, 0.003490},
         {0.001643, 0.003490, 0.264669}
     };
+	 double **measurement_matrix = (double**)malloc(3 * sizeof(double*));
+	 measurement_matrix[0] = (double*)malloc(1 * sizeof(double));
+	 measurement_matrix[1] = (double*)malloc(1 * sizeof(double));
+	 measurement_matrix[2] = (double*)malloc(1 * sizeof(double));
+	 // Update the array indexing and calibration values accordingly
+	 measurement_matrix[0][0] = x_magr + 19.026427;
+	 measurement_matrix[1][0] = y_magr - 90.319273;
+	 measurement_matrix[2][0] = z_magr - 90.319273;
 
-    // Allocate memory for the resulting matrix
-    double** multiplied_matrix = (double**)malloc(row * sizeof(double*));
-    for (int i = 0; i < row; i++) {
-        multiplied_matrix[i] = (double*)malloc(column2 * sizeof(double));
-    }
-
-    // Perform matrix multiplication
-    for (int i = 0; i < row; i++) {
-        for (int j = 0; j < column2; j++) {
-            multiplied_matrix[i][j] = 0;
-            for (int k = 0; k < column1; k++) {
-                multiplied_matrix[i][j] += matrix1[i][k] * calibrate_parameter[k][j];
-            }
-        }
-    }
-
-    return multiplied_matrix;
+		double **calibrated_matrix = Multiply_Matrix(measurement_matrix, calibrate_parameter);
+		freeMatrix(measurement_matrix); // Free the memory allocated for measurement_matrix
+		return calibrated_matrix;
 }
 double** mpu9250_calibrate_accel(double x_accr, double y_accr, double z_accr) {
+   double calibrate_parameter[3][3] = {
+		{1.004807, 0.011594, -0.012585},
+		{0.011594, 1.004890, 0.027382},
+		{-0.012585, 0.027382, 0.990353}
+	};
     double **measurement_matrix = (double**)malloc(3 * sizeof(double*));
-    for(int i=0;i<3;i++){
-    measurement_matrix[i] = (double*)malloc(1 * sizeof(double));}
+    measurement_matrix[0] = (double*)malloc(1 * sizeof(double));
+    measurement_matrix[1] = (double*)malloc(1 * sizeof(double));
+    measurement_matrix[2] = (double*)malloc(1 * sizeof(double));
 
     // Update the array indexing and calibration values accordingly
-    measurement_matrix[0][0] = x_accr - 0.038108;
-    measurement_matrix[1][0] = y_accr - 0.011325;
-    measurement_matrix[2][0] = z_accr + 0.047890;
+    measurement_matrix[0][0] = x_accr + 0.045867;
+    measurement_matrix[1][0] = y_accr + 0.262932;
+    measurement_matrix[2][0] = z_accr + 0.015154;
 
-    double **calibrated_matrix = Multiply(measurement_matrix, 3, 1, 3);
-    freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
+    double **calibrated_matrix = Multiply_Matrix(measurement_matrix, calibrate_parameter);
+    freeMatrix(measurement_matrix); // Free the memory allocated for measurement_matrix
     return calibrated_matrix;
 }
-
-double** Multiply(double** matrix1, int row, int column1, int column2) {
-    double calibrate_parameter[3][3] = {
-        {0.979159, 0.057901, -0.011943},
-        {0.057901, 1.010893, 0.006137},
-        {-0.011943, 0.006137, 0.996744}
-    };
-
-    // Allocate memory for the resulting matrix
-    double** multiplied_matrix = (double**)malloc(row * sizeof(double*));
-    for (int i = 0; i < row; i++) {
-        multiplied_matrix[i] = (double*)malloc(column2 * sizeof(double));
-    }
-
-    // Perform matrix multiplication
-    for (int i = 0; i < row; i++) {
-        for (int j = 0; j < column2; j++) {
-            multiplied_matrix[i][j] = 0;
-            for (int k = 0; k < column1; k++) {
-                multiplied_matrix[i][j] += matrix1[i][k] * calibrate_parameter[k][j];
-            }
-        }
-    }
-
-    return multiplied_matrix;
-}
-
 void mpu9250_init(){
 	//check if the device is connected
 	 HAL_StatusTypeDef	ret = HAL_I2C_IsDeviceReady(&hi2c1, (Device_Address<<1)+0, 2, General_Timeout);
@@ -188,24 +163,19 @@ void mpu9250_angel(double accx, double accy, double accz,
 					double gyrox,double gyroy,double gyroz,
 					double magx, double magy, double magz,
 					double* roll, double* pitch, double* yaw,
-					double* roll_acc, double* pitch_acc, double* roll_gyro, double* pitch_gyro, double *yaw_magneto,double* previous_roll_acc, double* previous_pitch_acc, int timer_val)
+					double* roll_acc, double* pitch_acc, double* roll_gyro, double* pitch_gyro, double *yaw_magneto,double* previous_roll_acc, double* previous_pitch_acc, double time)
 {
-	int sign;
 	int Xm, Ym;
 	static double previous_angle_roll_gyro = 0;
 	static double previous_angle_pitch_gyro = 0;
-	double time = timer_val * Time_constant;
-	if (accz>0){
-	}
-	else{
-		sign = -1;
-	}
     // Calculate roll angle
-    *roll_acc = atan2(accy, sign*sqrt(pow(accx, 2) + pow(accz, 2)));
+    (*pitch_acc) = atan2(accx,accz)*(180/PI);
     // Calculate pitch angle
-    *pitch_acc = atan2(-accx, sqrt(pow(accy, 2) + pow(accz, 2)));
+    (*roll_acc) = atan2(accy, accz)*(180/PI);
     //Low_pass filter to removed noise from accelerometer calculation
     Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
+    *previous_roll_acc = (*roll_acc);
+    *previous_pitch_acc = (*pitch_acc);
 
     if(starter == 1){
     	// Calculate angel from gyroscope
@@ -214,8 +184,8 @@ void mpu9250_angel(double accx, double accy, double accz,
     	previous_angle_roll_gyro = *roll_gyro;
     	previous_angle_pitch_gyro = *pitch_gyro;
     	//Calculate angel by sensor fusion
-    	Complimentary_filter(roll, gyrox, *roll_acc, time);
-    	Complimentary_filter(pitch, gyroy, *pitch_acc, time);
+    	Complimentary_filter(roll, gyrox, (*roll_acc), time);
+    	Complimentary_filter(pitch, gyroy, (*pitch_acc), time);
     	//Calculate angel by magnetometer
     	//Cross product to get the value of the Xm and Ym on 2D
     	Xm = magx * cos((*pitch)) - magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
@@ -226,15 +196,15 @@ void mpu9250_angel(double accx, double accy, double accz,
 }
 //Accelerometer and Gyroscope and Magnetometer read
 void mpu9250_read(uint32_t first_time){
-	static uint32_t current_time, previous_time;
-	int time;
+	static int current_time, previous_time;
+	double time;
  	static int counter = 0;
  	static double previous_roll_acc = 0;
  	static double previous_pitch_acc = 0;
  	static double roll = 0;
  	static double pitch =0;
-	counter = counter+1;
-	if(counter ==200){
+	counter = counter + 1;
+	if(counter == Sampling){
 		starter =1;
 	}
 	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro, yaw_magneto;
@@ -306,59 +276,51 @@ void mpu9250_read(uint32_t first_time){
 	current_time = __HAL_TIM_GET_COUNTER(&htim2);
 	if(counter == 1){
 		previous_time = first_time;
-		time = abs((int)current_time - (int)previous_time);
-		printf("Time: %d  ", time);
+		time = (current_time - previous_time)*Time_constant;
 		previous_time = current_time;
 	}
 	else{
 		if(current_time >= previous_time){
-			time = (int)current_time - (int)previous_time;
+			time = (current_time - previous_time)*Time_constant;
 		}
 		else {
-			time = Counter_limit -(int)previous_time + (int)current_time;
+			time = (Counter_limit -previous_time + current_time)*Time_constant;
 		}
 		previous_time = current_time;
 	}
 	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],
 					x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,calibrated_magnetometer[0][0], calibrated_magnetometer[1][0],calibrated_magnetometer[2][0],
-					&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto, &previous_roll_acc, &previous_pitch_acc, current_time);
-	//recalculate the angle calculated by accelerometer to degree
-	roll_acc = (roll_acc/PI)*180;
-	pitch_acc = (pitch_acc/PI)*180;
-	roll = (roll/PI)*180;
-	pitch = (pitch/PI)*180;
+					&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto, &previous_roll_acc, &previous_pitch_acc, time);
 	//print angel data
-
-
-	printf("Counter: %d  ", counter);
-	printf("Timer: %.5f \n ",(double)time*Time_constant);
-	printf("Roll_acc: %.5f  ",roll_acc);
-	printf("Pitch_acc: %.5f  \n",pitch_acc);
-
-	if(starter == 1){
-		printf("Roll_gyro: %.5f  ",roll_gyro);
-		printf("Pitch_gyro: %.5f  ",pitch_gyro);
-		printf("Yaw_magneto: %.5f  ",yaw_magneto);
-		printf("Roll: %.5f  ",roll);
-		printf("Pitch %.5f  \n",pitch);
-		printf("Yaw %.5f  \n", yaw);
-	}
-
+//
+//	if(starter == 1){
+//		printf("Roll_acc: %.5f  ",roll_acc);
+//		printf("Pitch_acc: %.5f  \n",pitch_acc);
+//		printf("Roll_gyro: %.5f  ",roll_gyro);
+//		printf("Pitch_gyro: %.5f  \n",pitch_gyro);
+//		printf("Roll: %.5f  ",roll);
+//		printf("Pitch %.5f  \n",pitch);
+//	}
+//		printf("Yaw_magneto: %.5f  ",yaw_magneto);
+//		printf("Yaw %.5f  \n", yaw);
+//	printf(" %.5f  ", x_accr);
+//	printf(" %.5f  ", y_accr);
+//	printf(" %.5f  \n", z_accr);
 	//print raw data
-   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
-   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
-   printf(" %.5f  ", calibrated_accelerometer[2][0]*g);
-	if(starter ==1){
-	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
-	    printf(" %.5f   ", y_gyro_calibrated);
-	    printf(" %.5f   ", z_gyro_calibrated);
-	}
-	else{
-	    printf(" %.5f   ", x_gyror);
-	    printf(" %.5f   ", y_gyror);
-	    printf(" %.5f   ", z_gyror);
-	}
-   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
-   printf(" %.5f  ", calibrated_magnetometer[1][0]);
-   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
+//	   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
+//	   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
+//	   printf(" %.5f  \n", calibrated_accelerometer[2][0]*g);
+//	if(starter ==1){
+//	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
+//	    printf(" %.5f   ", y_gyro_calibrated);
+//	    printf(" %.5f   \n", z_gyro_calibrated);
+//	}
+//	else{
+//	    printf(" %.5f   ", x_gyror);
+//	    printf(" %.5f   ", y_gyror);
+//	    printf(" %.5f  \n ", z_gyror);
+//	}
+//   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
+//   printf(" %.5f  ", calibrated_magnetometer[1][0]);
+//   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
 }
