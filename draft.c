@@ -121,7 +121,15 @@ void mpu9250_init(){
 		if(ret4 !=HAL_OK){
 				printf("The device fail exiting sleep mode. Check again\n");
 		}
-		magnetometer_init();
+	//Initialize magnetometer
+	magnetometer_init();
+	//Initialize Kalman filter
+	Kalman kalman_roll;
+	Kalman kalman_pitch;
+	Kalman_init(&kalman_roll);
+	Kalman_init(&kalman_pitch);
+	Kalman_setAngle(&kalman_roll,0);
+	Kalman_setAngle(&kalman_pitch,0);
 }
 
 //magnetomert configuration
