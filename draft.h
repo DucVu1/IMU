@@ -14,9 +14,11 @@
 #define Time_constant 0.00025 //4000Hz frequency
 #define Time_constant_filter 0.5 //should inspect to get a better number (read Low cost IMU implementation)
 #define g 9.8
-#define trust 0.95
+#define trust 0.02
 #define cutoff 0.95
 #define Counter_limit 100000
+#define RAD_TO_DEG 180/PI
+#define RESTRICT_PITCH
 
 //checking register
 #define Device_WAI 0x75 // return should be 0x71 or 113
@@ -35,6 +37,7 @@
 #define GYRO_Z_L 72
 #define REG_CONFIG_GYRO 27
 #define Scale_Constant_Gyro 131.0
+#define Sampling 100
 //accelerometer register and Parameter
 #define FS_ACC_2G 0
 #define FS_ACC_4G 8
