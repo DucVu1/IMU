@@ -14,20 +14,21 @@ data_array = np.array(data)
 # Get the number of columns in the data
 num_columns = data_array.shape[1]
 
-# Sort Kalman angle and normal angle data column by column
-sorted_kalman_data = [np.sort(data_array[:, col]) for col in range(num_columns // 2)]
-sorted_normal_data = [np.sort(data_array[:, col + num_columns // 2]) for col in range(num_columns // 2)]
+# Split the data into Kalman angle and normal angle arrays
+kalman_data = data_array[:, :num_columns // 2]
+normal_data = data_array[:, num_columns // 2:]
 
-# Plot the sorted data for each column
-for col_idx, (sorted_kalman_col_data, sorted_normal_col_data) in enumerate(zip(sorted_kalman_data, sorted_normal_data)):
-    plt.plot(sorted_kalman_col_data, label=f"Kalman Column {col_idx + 1}")
-    plt.plot(sorted_normal_col_data, label=f"Normal Column {col_idx + 1}", linestyle='dashed')
+# Plot the data for each column
+for col_idx in range(num_columns // 2):
+    plt.plot(-kalman_data[:, col_idx], label=f"Flipped Kalman Column {col_idx + 1}")
+    plt.plot(normal_data[:, col_idx], label=f"Normal Column {col_idx + 1}", linestyle='dashed')
 
 # Add labels and title
-plt.xlabel('time')
+plt.xlabel('Time')
 plt.ylabel('Angle Value')
-plt.title('Sorted Kalman Angle and Normal Angle Data for Each Column')
+plt.title('Flipped Kalman Angle and Normal Angle Data for Each Column')
 plt.legend()
 
 # Show the plot
 plt.show()
+
