@@ -170,6 +170,12 @@ void mpu9250_init() {
     Kalman_init(&kalman_pitch);
     Kalman_setAngle(&kalman_roll, 0);
     Kalman_setAngle(&kalman_pitch, 0);
+    Kalman_setRmeasure(&kalman_pitch,0.0121);
+    Kalman_setRmeasure(&kalman_roll,0.1849);
+    Kalman_setQbias(&kalman_pitch,0.04);
+    Kalman_setQangle(&kalman_pitch,0.00179776); //IF WE REMOVE Delay should re calculate
+    Kalman_setQbias(&kalman_roll,0.0144);
+    Kalman_setQangle(&kalman_roll,0.000647193);
 }
 
 // magnetometer configuration
@@ -222,7 +228,7 @@ void mpu9250_angel(double accx, double accy, double accz,
 
     // Calculate roll angle
 #ifdef RESTRICT_PITCH // Eq. 25 and 26
-    *roll_acc = atan2(accx, accz) * RAD_TO_DEG;
+    *roll_acc = atan2(accy, accz) * RAD_TO_DEG;
     *pitch_acc = atan(-accx / sqrt(accy * accy + accz * accz)) * RAD_TO_DEG;
 #else // Eq. 28 and 29
     *roll_acc = atan(accy / sqrt(accx * accx + accz * accz)) * RAD_TO_DEG;
@@ -383,16 +389,16 @@ void mpu9250_read(uint32_t first_time){
 				calibrated_magnetometer[2][0],&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto,
 				&previous_roll_acc, &previous_pitch_acc,&roll_kalman, &pitch_kalman, time);
 	//print angel data
-
+//		printf("%.5f  ", roll_acc);
+//		printf("%.5f  \n",pitch_acc);
 	if(starter == 1){
-//		printf("Roll_acc: %.5f  ",roll_acc);
-//		printf("Pitch_acc: %.5f  \n",pitch_acc);
 //		printf("Roll_gyro: %.5f  ",roll_gyro);
 //		printf("Pitch_gyro: %.5f  \n",pitch_gyro);
-//		printf("Roll: %.5f  ",roll);
-//		printf("Kalman roll: %.5f ",roll_kalman);
-		printf(" %.5f ",pitch_kalman);
-		printf(" %.5f \n ",pitch);
+		Kalman_printgain(&kalman_roll);
+		printf(" %.5f ",roll_kalman);
+		printf(" %.5f  \n",roll);
+//		printf(" %.5f ",pitch_kalman);
+//		printf(" %.5f \n ",pitch);
 	}
 //		printf("Yaw_magneto: %.5f  ",yaw_magneto);
 //		printf("Yaw %.5f  \n", yaw);
@@ -404,9 +410,9 @@ void mpu9250_read(uint32_t first_time){
 //	   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
 //	   printf(" %.5f  \n", calibrated_accelerometer[2][0]*g);
 //	if(starter ==1){
-//	    printf("Calibrated gyro: %.5f  ", x_gyro_calibrated);
-//	    printf(" %.5f   ", y_gyro_calibrated);
-//	    printf(" %.5f   \n", z_gyro_calibrated);
+//	    printf(" %.5f  ", x_gyro_calibrated);
+//	    printf(" %.5f  \n", y_gyro_calibrated);
+//	    printf(" %.5f  \n", z_gyro_calibrated);
 //	}
 //	else{
 //	    printf(" %.5f   ", x_gyror);
