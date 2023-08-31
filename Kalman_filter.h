@@ -1,6 +1,6 @@
 #ifndef _Kalman_h
 #define _Kalman_h
-
+#include "stdio.h"
 typedef struct {
     double Q_angle;
     double Q_bias;
@@ -17,8 +17,8 @@ typedef struct {
 } Kalman;
 
 void Kalman_init(Kalman *kalman) {
-    kalman->Q_angle = 0.001;
-    kalman->Q_bias = 0.003;
+    kalman->Q_angle = 0.000025088;
+    kalman->Q_bias = 0.0144;
     kalman->R_measure = 0.03;
 
     kalman->angle = 0;
@@ -59,7 +59,9 @@ double Kalman_getAngle(Kalman *kalman, double newAngle, double newRate, double d
 void Kalman_setAngle(Kalman *kalman, double newAngle) {
     kalman->angle = newAngle;
 }
-
+void Kalman_printgain(Kalman *kalman){
+	printf("%.7f",kalman->K[0]);
+}
 double Kalman_getRate(Kalman *kalman) {
     return kalman->rate;
 }
