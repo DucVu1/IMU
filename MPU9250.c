@@ -235,6 +235,10 @@ void mpu9250_angel(double accx, double accy, double accz,
     *pitch_acc = atan2(-accx, accz) * RAD_TO_DEG;
 #endif
 
+	Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
+	*previous_roll_acc = (*roll_acc);
+	*previous_pitch_acc = (*pitch_acc);
+
 #ifdef RESTRICT_PITCH
     // This fixes the transition problem when the accelerometer angle jumps between -180 and 180 degrees
     if ((*roll_acc < -90 && *roll_kalman > 90) || (*roll_acc > 90 && *roll_kalman < -90)) {
@@ -268,9 +272,6 @@ void mpu9250_angel(double accx, double accy, double accz,
 #endif
 
     // Low_pass filter to removed noise from accelerometer calculation
-    Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
-    *previous_roll_acc = (*roll_acc);
-    *previous_pitch_acc = (*pitch_acc);
 
     if (starter == 1) {
         // Calculate angel from gyroscope
