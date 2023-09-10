@@ -63,21 +63,21 @@ double** mpu9250_calibrate_magneto(double x_magr, double y_magr, double z_magr) 
      for (int i = 0; i < 3; i++) {
     	 calibrate_parameter[i] = (double*)malloc(1 * sizeof(double));
      }
-	calibrate_parameter[0][0] = 0.207995;
-	calibrate_parameter[0][1] = 0.032704;
-	calibrate_parameter[0][2] = 0.001643;
+	calibrate_parameter[0][0] = 0.129570;
+	calibrate_parameter[0][1] = 0.023034;
+	calibrate_parameter[0][2] = -0.007670;
 
-	calibrate_parameter[1][0] = 0.032704;
-	calibrate_parameter[1][1] = 0.180287;
-	calibrate_parameter[1][2] = 0.003490;
+	calibrate_parameter[1][0] = 0.023034;
+	calibrate_parameter[1][1] = 0.311766;
+	calibrate_parameter[1][2] = -0.007670;
 
-	calibrate_parameter[2][0] = 0.001643;
-	calibrate_parameter[2][1] = 0.003490;
-	calibrate_parameter[2][2] = 0.264669;
+	calibrate_parameter[2][0] = -0.007670;
+	calibrate_parameter[2][1] = 0.000145;
+	calibrate_parameter[2][2] = 0.283359;
     // Update the array indexing and calibration values accordingly
-    measurement_matrix[0][0] = x_magr + 19.026427;
-    measurement_matrix[1][0] = y_magr - 90.319273;
-    measurement_matrix[2][0] = z_magr - 90.319273;
+    measurement_matrix[0][0] = x_magr - 115.483107;
+    measurement_matrix[1][0] = y_magr - 149.306660;
+    measurement_matrix[2][0] = z_magr + 109.170683;
 
     double **calibrated_matrix = Multiply(measurement_matrix,calibrate_parameter, 3, 3, 1);
     freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
@@ -93,22 +93,22 @@ double** mpu9250_calibrate_accel(double x_accr, double y_accr, double z_accr) {
        for (int i = 0; i < 3; i++) {
       	 calibrate_parameter[i] = (double*)malloc(1 * sizeof(double));
        }
-   calibrate_parameter[0][0] = 1.005453;
-   calibrate_parameter[0][1] = 0.000134;
-   calibrate_parameter[0][2] = 0.007665;
+   calibrate_parameter[0][0] = 1.901969;
+   calibrate_parameter[0][1] = 0.629598;
+   calibrate_parameter[0][2] = 0.182719;
 
-   calibrate_parameter[1][0] = 0.000134;
-   calibrate_parameter[1][1] = 1.004245;
-   calibrate_parameter[1][2] = -0.000883;
+   calibrate_parameter[1][0] = 0.629598;
+   calibrate_parameter[1][1] = 1.882645;
+   calibrate_parameter[1][2] = -0.206274;
 
-   calibrate_parameter[2][0] = 0.007665;
-   calibrate_parameter[2][1] = -0.000883;
-   calibrate_parameter[2][2] = 0.992212;
+   calibrate_parameter[2][0] = 0.182719;
+   calibrate_parameter[2][1] = -0.206274;
+   calibrate_parameter[2][2] = 1.940258;
 
     // Update the array indexing and calibration values accordingly
-    measurement_matrix[0][0] = x_accr + 0.007122;
-    measurement_matrix[1][0] = y_accr + 0.011151;
-    measurement_matrix[2][0] = z_accr - 0.064440;
+    measurement_matrix[0][0] = x_accr - 0.604620;
+    measurement_matrix[1][0] = y_accr + 0.593135;
+    measurement_matrix[2][0] = z_accr + 0.165897;
 
     double **calibrated_matrix = Multiply(measurement_matrix,calibrate_parameter, 3, 3, 1);
     freeMatrix(measurement_matrix, 3); // Free the memory allocated for measurement_matrix
@@ -144,7 +144,7 @@ void mpu9250_init() {
     }
 
     // Config accelerometer
-    uint8_t temp_data = FS_ACC_2G;
+    uint8_t temp_data = FS_ACC_4G;
     HAL_StatusTypeDef ret2 = HAL_I2C_Mem_Write(&hi2c1, (Device_Address << 1) + 0, REG_CONFIG_ACC, 1, &temp_data, 1, General_Timeout);
     if (ret2 != HAL_OK) {
         printf("The device accelerometer is not written. Check again\n");
@@ -164,7 +164,7 @@ void mpu9250_init() {
         printf("The device fail exiting sleep mode. Check again\n");
     }
 
-    // magnetometer_init();
+     magnetometer_init();
 
     Kalman_init(&kalman_roll);
     Kalman_init(&kalman_pitch);
@@ -202,6 +202,10 @@ void magnetometer_init() {
     if (ret2 != HAL_OK) {
         printf("The device Magnetometer mode is not configured yet. Check again\n");
     }
+//    uint8_t sensor_check;
+//    HAL_I2C_Mem_Read(&hi2c1, (AK8963_Address << 1) + 0, AK8963_WAI, 1, &sensor_check, 1, General_Timeout);
+//    printf("Sensor check: %d\n",sensor_check);
+
 }
 
 // Lowpass_filter for accelerometer
@@ -219,66 +223,73 @@ void mpu9250_angel(double accx, double accy, double accz,
                    double magx, double magy, double magz,
                    double* roll, double* pitch, double* yaw,
                    double* roll_acc, double* pitch_acc, double* roll_gyro,
-                   double* pitch_gyro, double *yaw_magneto, double* previous_roll_acc,
+                   double* pitch_gyro, double *yaw_gyro,double *yaw_magneto, double* previous_roll_acc,
                    double* previous_pitch_acc, double *roll_kalman, double *pitch_kalman,
                    double time) {
-    int Xm, Ym;
+    double Xm, Ym;
     static double previous_angle_roll_gyro = 0;
     static double previous_angle_pitch_gyro = 0;
-
-    // Calculate roll angle
-#ifdef RESTRICT_PITCH // Eq. 25 and 26
-    *roll_acc = atan2(accy, accz) * RAD_TO_DEG;
-    *pitch_acc = atan(-accx / sqrt(accy * accy + accz * accz)) * RAD_TO_DEG;
-#else // Eq. 28 and 29
-    *roll_acc = atan(accy / sqrt(accx * accx + accz * accz)) * RAD_TO_DEG;
-    *pitch_acc = atan2(-accx, accz) * RAD_TO_DEG;
-#endif
-
-	Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
-	*previous_roll_acc = (*roll_acc);
-	*previous_pitch_acc = (*pitch_acc);
-
-#ifdef RESTRICT_PITCH
-    // This fixes the transition problem when the accelerometer angle jumps between -180 and 180 degrees
-    if ((*roll_acc < -90 && *roll_kalman > 90) || (*roll_acc > 90 && *roll_kalman < -90)) {
-        Kalman_setAngle(&kalman_roll, *roll_acc);
-        *roll = *roll_acc;
-        *roll_kalman = *roll_acc;
-        *roll_gyro = *roll_acc;
-    } else {
-        *roll_kalman = Kalman_getAngle(&kalman_roll, *roll_acc, gyrox, time); // Calculate the angle using a Kalman filter
-    }
-
-    if (abs(*roll_kalman) > 90) {
-        gyroy = -gyroy; // Invert rate, so it fits the restricted accelerometer reading
-    }
-    *pitch_kalman = Kalman_getAngle(&kalman_pitch, *pitch_acc, gyroy, time);
-#else
-    // This fixes the transition problem when the accelerometer angle jumps between -180 and 180 degrees
-    if ((*pitch_acc < -90 && *pitch_kalman > 90) || (*pitch_acc > 90 && *pitch_kalman < -90)) {
-    	Kalman_setAngle(&kalman_pitch,*pitch_acc);
-    	*pitch = *pitch_acc;
-        *pitch_kalman = *pitch_acc;
-        *pitch_gyro = *pitch_acc;
-    } else {
-        *pitch_kalman = Kalman_getAngle(&kalman_pitch, *pitch_acc, gyroy, time); // Calculate the angle using a Kalman filter
-    }
-
-    if (abs(*pitch_kalman) > 90) {
-        gyrox = -gyrox; // Invert rate, so it fits the restricted accelerometer reading
-    }
-    *roll_kalman = Kalman_getAngle(&kalman_roll, *roll_acc, gyrox, time); // Calculate the angle using a Kalman filter
-#endif
-
-    // Low_pass filter to removed noise from accelerometer calculation
-
+//    static double previous_angle_yaw_gyro = 0; since we don't use yaw angle
+//    *yaw_magneto = atan2(-magy,magx);
     if (starter == 1) {
+		// Calculate roll angle
+	#ifdef RESTRICT_PITCH // Eq. 25 and 26
+		*roll_acc = atan2(accy, accz) * RAD_TO_DEG;
+		*pitch_acc = atan(-accx / sqrt(accy * accy + accz * accz)) * RAD_TO_DEG;
+	#else // Eq. 28 and 29
+		*roll_acc = atan(accy / sqrt(accx * accx + accz * accz)) * RAD_TO_DEG;
+		*pitch_acc = atan2(-accx, accz) * RAD_TO_DEG;
+	#endif
+	    // Low_pass filter to removed noise from accelerometer calculation
+		Lowpass_filter(roll_acc, *previous_roll_acc, pitch_acc, *previous_pitch_acc);
+		*previous_roll_acc = (*roll_acc);
+		*previous_pitch_acc = (*pitch_acc);
+
+	#ifdef RESTRICT_PITCH
+		// This fixes the transition problem when the accelerometer angle jumps between -180 and 180 degrees
+		if ((*roll_acc < -90 && *roll_kalman > 90) || (*roll_acc > 90 && *roll_kalman < -90)) {
+			Kalman_setAngle(&kalman_roll, *roll_acc);
+			*roll = *roll_acc;
+			*roll_kalman = *roll_acc;
+			*roll_gyro = *roll_acc;
+		} else {
+			*roll_kalman = Kalman_getAngle(&kalman_roll, *roll_acc, gyrox, time); // Calculate the angle using a Kalman filter
+		}
+
+		if (abs(*roll_kalman) > 90) {
+			gyroy = -gyroy; // Invert rate, so it fits the restricted accelerometer reading
+		}
+		*pitch_kalman = Kalman_getAngle(&kalman_pitch, *pitch_acc, gyroy, time);
+	#else
+		// This fixes the transition problem when the accelerometer angle jumps between -180 and 180 degrees
+		if ((*pitch_acc < -90 && *pitch_kalman > 90) || (*pitch_acc > 90 && *pitch_kalman < -90)) {
+			Kalman_setAngle(&kalman_pitch,*pitch_acc);
+			*pitch = *pitch_acc;
+			*pitch_kalman = *pitch_acc;
+			*pitch_gyro = *pitch_acc;
+		} else {
+			*pitch_kalman = Kalman_getAngle(&kalman_pitch, *pitch_acc, gyroy, time); // Calculate the angle using a Kalman filter
+		}
+
+		if (abs(*pitch_kalman) > 90) {
+			gyrox = -gyrox; // Invert rate, so it fits the restricted accelerometer reading
+		}
+		*roll_kalman = Kalman_getAngle(&kalman_roll, *roll_acc, gyrox, time); // Calculate the angle using a Kalman filter
+	#endif
+//	    Xm = magx*cos((*pitch_kalman)*DEG_TO_RAD)- magy*sin((*roll_kalman)*DEG_TO_RAD)*sin((*pitch_kalman)*DEG_TO_RAD)+magz*cos((*roll_kalman)*DEG_TO_RAD)*sin((*pitch_kalman)*DEG_TO_RAD);
+//	    Ym = magy*cos((*roll_kalman)*DEG_TO_RAD)+ magz*sin((*roll_kalman)*DEG_TO_RAD);
+//		double Norm = sqrt(magx*magx +magy*magy +magz*magz);
+//		Xm = magx/Norm;
+//		Ym = magy/Norm;
+
+//	    *yaw = atan2(Ym,Xm);
         // Calculate angel from gyroscope
         *roll_gyro = gyrox * time + previous_angle_roll_gyro;
         *pitch_gyro = gyroy * time + previous_angle_pitch_gyro;
+//        *yaw_gyro = gyroz * time + previous_angle_yaw_gyro;
         previous_angle_roll_gyro = *roll_gyro;
         previous_angle_pitch_gyro = *pitch_gyro;
+//        previous_angle_yaw_gyro = *yaw_gyro;
 
         // Calculate angel by sensor fusion
         Complimentary_filter(roll, gyrox, (*roll_acc), time);
@@ -286,10 +297,6 @@ void mpu9250_angel(double accx, double accy, double accz,
 
         // Calculate angel by magnetometer
         // Cross product to get the value of the Xm and Ym on 2D
-        Xm = magx * cos((*pitch)) - magy * sin((*roll)) * sin((*pitch)) + magz * cos((*roll)) * sin((*pitch));
-        Ym = magy * cos(*roll) + magz * sin(*roll);
-        *yaw_magneto = atan2(Ym, Xm);
-        Complimentary_filter(yaw, gyroz, *yaw_magneto, time);
     }
 }
 void mpu9250_read(uint32_t first_time){
@@ -304,7 +311,7 @@ void mpu9250_read(uint32_t first_time){
 	if(counter == Sampling){
 		starter =1;
 	}
-	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro, yaw_magneto,roll_kalman, pitch_kalman;
+	double yaw, roll_acc, pitch_acc, roll_gyro, pitch_gyro, yaw_gyro, yaw_magneto, roll_kalman, pitch_kalman;
 
 	// declare variables
 	uint8_t acc_mea_x[2],acc_mea_y[2],acc_mea_z[2],gyro_mea_x[2],gyro_mea_y[2],gyro_mea_z[2];
@@ -343,7 +350,6 @@ void mpu9250_read(uint32_t first_time){
 		HAL_I2C_Mem_Read(&hi2c1, (AK8963_Address<<1)+0, MAG_Z_L, 1, &mag_mea_z[0], 1, General_Timeout);
 		HAL_I2C_Mem_Read(&hi2c1, (AK8963_Address<<1)+0, MAG_Z_H, 1, &mag_mea_z[1], 1, General_Timeout);
 		HAL_I2C_Mem_Read(&hi2c1, (AK8963_Address<<1)+0, REG_ST2, 1, &overflow_check, 1, General_Timeout);
-
 		if(!(overflow_check & 0x08)) {
 		   x_mag = ((int16_t)mag_mea_x[1] << 8) | mag_mea_x[0];
 		   y_mag = ((int16_t)mag_mea_y[1] << 8) | mag_mea_y[0];
@@ -354,7 +360,9 @@ void mpu9250_read(uint32_t first_time){
 		}
 	}
 	//Scale to the desire (not calibrated)
-
+	double x_magr = x_mag/10.0;
+	double y_magr = y_mag/10.0;
+	double z_magr = z_mag/10.0;
 	double x_accr = x_acc/Scale_Constant_Acc;
 	double z_accr = z_acc/Scale_Constant_Acc;
 	double y_accr = y_acc/Scale_Constant_Acc;
@@ -387,25 +395,29 @@ void mpu9250_read(uint32_t first_time){
 	}
 	mpu9250_angel(calibrated_accelerometer[0][0], calibrated_accelerometer[1][0],calibrated_accelerometer[2][0],
 				x_gyro_calibrated,y_gyro_calibrated,z_gyro_calibrated,calibrated_magnetometer[0][0], calibrated_magnetometer[1][0],
-				calibrated_magnetometer[2][0],&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_magneto,
+				calibrated_magnetometer[2][0],&roll,&pitch,&yaw, &roll_acc, &pitch_acc, &roll_gyro, &pitch_gyro, &yaw_gyro, &yaw_magneto,
 				&previous_roll_acc, &previous_pitch_acc,&roll_kalman, &pitch_kalman, time);
 	//print angel data
 //		printf("%.5f  ", roll_acc);
 //		printf("%.5f  \n",pitch_acc);
-	if(starter == 1){
+//	if(starter == 1){
 //		printf("Roll_gyro: %.5f  ",roll_gyro);
 //		printf("Pitch_gyro: %.5f  \n",pitch_gyro);
-		Kalman_printgain(&kalman_roll);
-		printf(" %.5f ",roll_kalman);
-		printf(" %.5f  \n",roll);
+//		Kalman_printgain(&kalman_roll);
+//		printf(" %.5f ",roll_kalman);
+//		printf(" %.5f  \n",roll);
 //		printf(" %.5f ",pitch_kalman);
 //		printf(" %.5f \n ",pitch);
-	}
-//		printf("Yaw_magneto: %.5f  ",yaw_magneto);
-//		printf("Yaw %.5f  \n", yaw);
+//		printf("%.5f \n",yaw*RAD_TO_DEG);
+//		printf("%.5f ",yaw_gyro);
+//	}
+//	printf("%.5f \n",yaw_magneto*RAD_TO_DEG);
 //	printf(" %.5f  ", x_accr);
 //	printf(" %.5f  ", y_accr);
 //	printf(" %.5f  \n", z_accr);
+//	printf(" %.5f  ", x_magr);
+//	printf(" %.5f  ", y_magr);
+//	printf(" %.5f  \n", z_magr);
 	//print raw data
 //	   printf("Calibrated acc: %.5f ", calibrated_accelerometer[0][0]*g);
 //	   printf(" %.5f  ", calibrated_accelerometer[1][0]*g);
@@ -420,7 +432,7 @@ void mpu9250_read(uint32_t first_time){
 //	    printf(" %.5f   ", y_gyror);
 //	    printf(" %.5f  \n ", z_gyror);
 //	}
-//   printf("Calibrated mag: %.5f  ", calibrated_magnetometer[0][0]);
+//   printf(" %.5f  ", calibrated_magnetometer[0][0]);
 //   printf(" %.5f  ", calibrated_magnetometer[1][0]);
 //   printf(" %.5f    \n", calibrated_magnetometer[2][0]);
 }
